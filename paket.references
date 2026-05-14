@@ -1,0 +1,11 @@
+FSharp.Core
+Alma.ApplicationStatus
+Alma.Status.Common
+Alma.EnvironmentModel
+Alma.Kafka
+Alma.Logging
+Alma.Profiler
+Alma.Profiler.Common
+Feather.ErrorHandling
+Alma.ServiceIdentification
+Alma.WebApplication

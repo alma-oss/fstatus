@@ -1,0 +1,36 @@
+framework: net10.0
+storage: none
+
+source https://api.nuget.org/v3/index.json
+nuget FSharp.Core ~> 10.0
+
+nuget Alma.ApplicationStatus ~> 8.0
+nuget Alma.Status.Common ~> 1.0
+nuget Alma.EnvironmentModel ~> 10.0
+nuget Alma.Kafka ~> 30.1
+nuget Alma.Logging ~> 12.0
+nuget Alma.Profiler ~> 9.0
+nuget Alma.Profiler.Common ~> 10.0
+nuget Feather.ErrorHandling ~> 2.0
+nuget Alma.ServiceIdentification ~> 11.0
+nuget Alma.WebApplication ~> 14.0
+
+// [ TESTS GROUP ]
+group Tests
+    storage none
+    source https://api.nuget.org/v3/index.json
+    nuget Expecto
+    nuget YoloDev.Expecto.TestSdk
+
+// [ FAKE GROUP ]
+group Build
+    storage none
+    source https://api.nuget.org/v3/index.json
+    nuget Fake.DotNet.Cli
+    nuget Fake.IO.FileSystem
+    nuget Fake.IO.Zip
+    nuget Fake.Core.Target
+    nuget Fake.Core.UserInput
+    nuget Fake.DotNet.AssemblyInfoFile
+    nuget Fake.Core.ReleaseNotes
+    nuget Fake.Tools.Git
