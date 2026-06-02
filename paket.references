@@ -4,6 +4,7 @@ Alma.Status.Common
 Alma.EnvironmentModel
 Alma.Kafka
 Alma.Logging
+Alma.Metrics
 Alma.Profiler
 Alma.Profiler.Common
 Feather.ErrorHandling

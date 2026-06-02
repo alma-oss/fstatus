@@ -18,6 +18,36 @@ type StatusChange = {
 type OnStatusChange = StatusChange -> unit
 
 [<RequireQualifiedAccess>]
+module OnStatusChange =
+    open Alma.Metrics
+
+    type Resource = Resource of (ResourceType -> Instance -> ResourceAvailability)
+
+    let private enable currentInstance resourceAvailability =
+        resourceAvailability
+        |> ResourceAvailability.enable currentInstance
+        |> ignore
+
+    let private disable currentInstance resourceAvailability =
+        resourceAvailability
+        |> ResourceAvailability.disable currentInstance
+        |> ignore
+
+    let resourceAvailability (Resource resource) currentInstance: OnStatusChange =
+        fun statusChange ->
+            let resourceInstance = statusChange.Instance
+            let resourceType =
+                match statusChange.ResourceKind with
+                | ServiceResource -> ResourceType "service"
+                | DataObjectResource -> ResourceType "dataObject"
+
+            match statusChange.Status with
+            | Status.Normal _
+            | Status.Info _ -> resource resourceType resourceInstance |> enable currentInstance
+            | Status.Warning _
+            | Status.Critical _ -> resource resourceType resourceInstance |> disable currentInstance
+
+[<RequireQualifiedAccess>]
 module StatusMessage =
     let create message = {
         DateTime = DateTimeOffset.Now
