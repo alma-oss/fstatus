@@ -67,7 +67,7 @@ module History =
         CheckResult: CheckResult
     }
 
-    type ConsumeIncidentEvents = ConnectionConfiguration -> seq<Async<Result<IncidentEvent, ConsumeError>>>
+    type ConsumeIncidentEvents = ConsumerConfiguration -> seq<Async<Result<IncidentEvent, ConsumeError>>>
 
     let private eventToIncidentHistory event =
         let level =
@@ -104,7 +104,8 @@ module History =
         let logger = loggerFactory.CreateLogger("History")
 
         async {
-            consume connection
+            ConsumerConfiguration.createWithConnection connection GroupId.Random
+            |> consume
             |> Seq.choose (fun consumeResult ->
                 match consumeResult |> Async.RunSynchronously with
                 | Ok event -> event |> eventToIncidentHistory
