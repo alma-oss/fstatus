@@ -1,5 +1,9 @@
 # AGENTS.md — fstatus (Alma.Status)
 
+## Agent Skills
+
+This repo ships Agent Skill for the `Alma.Status` library. Compatible agents discover it automatically; see `.agents/skills/fstatus/SKILL.md`.
+
 ## Project Purpose
 
 F# library (`Alma.Status`) for running health checks over services and data objects, aggregating system status, tracking status changes, and collecting incident history. It is typically embedded into service-monitoring or status-page applications rather than run as a standalone service.
