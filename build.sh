@@ -3,7 +3,7 @@
 set -eu
 set -o pipefail
 
-quiet() {
+run() {
     if [ -n "${RTK_ACTIVE:-}" ]; then
         local output
         if ! output=$("$@" 2>&1); then
@@ -15,10 +15,10 @@ quiet() {
     fi
 }
 
-quiet dotnet tool restore
-quiet dotnet tool run paket restore
+run dotnet tool restore
+run dotnet tool run paket restore
 # pre-build so the `dotnet run --no-build` below emits no restore/build chatter
-quiet dotnet build ./build/build.fsproj
+run dotnet build ./build/build.fsproj
 
 # shellcheck disable=SC2068
 FAKE_DETAILED_ERRORS=true dotnet run --no-build --project ./build/build.fsproj -- $@

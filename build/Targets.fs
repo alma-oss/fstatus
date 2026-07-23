@@ -21,8 +21,6 @@ module internal Targets =
 
     [<RequireQualifiedAccess>]
     module SafeStackTargets =
-        open SafeBuildHelpers
-
         let init safe =
             Target.create "SafeClean" (fun _ ->
                 Shell.cleanDir safe.DeployPath
@@ -37,8 +35,8 @@ module internal Targets =
 
             Target.create "Bundle" (fun _ ->
                 [
-                    "server", toProcess (Dotnet Publish) [ "-c"; "Release"; "-o"; safe.DeployPath ] safe.ServerPath
-                    "client", toProcess (Dotnet Fable) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite"; "build" ] safe.ClientPath
+                    toJob (JobName "server") (Dotnet Publish) [ "-c"; "Release"; "-o"; safe.DeployPath ] safe.ServerPath
+                    toJob (JobName "client") (Dotnet Fable) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite"; "build" ] safe.ClientPath
                 ]
                 |> runParallel
             )
@@ -46,8 +44,8 @@ module internal Targets =
             Target.create "Run" (fun _ ->
                 run (Dotnet Build) [] safe.SharedPath
                 [
-                    "server", toProcess (Dotnet WatchRun) [] safe.ServerPath
-                    "client", toProcess (Dotnet FableWatch) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientPath
+                    toJob (JobName "server") (Dotnet WatchRun) [] safe.ServerPath
+                    toJob (JobName "client") (Dotnet FableWatch) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientPath
                 ]
                 |> runParallel
             )
@@ -56,8 +54,8 @@ module internal Targets =
                 run (Dotnet Build) [] safe.SharedPath
                 Environment.setEnvironVar "RUN_IN" "mirrord"
                 [
-                    "server", toProcess Mirrord [ "exec"; "--config-file"; "../../.mirrord/mirrord.json"; "--"; "dotnet"; "watch"; "run" ] safe.ServerPath
-                    "client", toProcess (Dotnet FableWatch) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientPath
+                    toJob (JobName "server") Mirrord [ "exec"; "--config-file"; "../../.mirrord/mirrord.json"; "--"; "dotnet"; "watch"; "run" ] safe.ServerPath
+                    toJob (JobName "client") (Dotnet FableWatch) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientPath
                 ]
                 |> runParallel
             )
@@ -66,8 +64,8 @@ module internal Targets =
                 run (Dotnet Build) [] safe.SharedTestsPath
 
                 [
-                    "server", toProcess (Dotnet WatchRun) [] safe.ServerTestsPath
-                    "client", toProcess (Dotnet FableWatch) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientTestsPath
+                    toJob (JobName "server") (Dotnet WatchRun) [] safe.ServerTestsPath
+                    toJob (JobName "client") (Dotnet FableWatch) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientTestsPath
                 ]
                 |> runParallel
             )
@@ -76,8 +74,8 @@ module internal Targets =
                 run (Dotnet Build) [] safe.SharedTestsPath
 
                 [
-                    "server", toProcess (Dotnet Tests) [] safe.ServerTestsPath
-                    //"client", toProcess (Dotnet FableWatch) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientTestsPath
+                    toJob (JobName "server") (Dotnet Tests) [] safe.ServerTestsPath
+                    //toJob (JobName "client") (Dotnet FableWatch) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientTestsPath
                 ]
                 |> runParallel
             )
@@ -148,7 +146,7 @@ module internal Targets =
                 let release =
                     definition.ChangeLog
                     |> Option.bind (fun changeLog ->
-                        try ReleaseNotes.parse (System.IO.File.ReadAllLines changeLog |> Seq.filter ((<>) "## Unreleased")) |> Some
+                        try ReleaseNotes.parse (File.ReadAllLines changeLog |> Seq.filter ((<>) "## Unreleased")) |> Some
                         with _ -> None
                     )
 
@@ -232,7 +230,7 @@ module internal Targets =
                 if releaseDir </> "zipCompiled" |> File.exists
                 then
                     Trace.tracefn "\nZipping released files in %s ..." releaseDir
-                    run (Raw (releaseDir </> "zipCompiled")) [] "."
+                    run (Command.Raw (releaseDir </> "zipCompiled")) [] "."
 
                 Trace.tracefn "\nZip compiled files"
                 runtimeIds
