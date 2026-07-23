@@ -8,6 +8,8 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="RtkFilter.fs" />
+        <Compile Include="Commands.fs" />
         <Compile Include="Utils.fs" />
         <Compile Include="SafeBuildHelpers.fs" />
         <Compile Include="Targets.fs" />

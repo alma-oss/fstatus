@@ -11,6 +11,7 @@ module internal Targets =
     open Fake.IO.Globbing.Operators
     open Fake.Core.TargetOperators
 
+    open Commands
     open Utils
     open Github.Types
 
@@ -25,57 +26,58 @@ module internal Targets =
         let init safe =
             Target.create "SafeClean" (fun _ ->
                 Shell.cleanDir safe.DeployPath
-                run dotnet [ "fable"; "clean"; "--yes" ] safe.ClientPath // Delete *.fs.js files created by Fable
+                // Delete *.fs.js files created by Fable
+                run (Dotnet Fable) [ "clean"; "--yes" ] safe.ClientPath
             )
 
             Target.create "InstallClient" (fun _ ->
-                run npm [ "--version" ] "."
-                run npm [ "install" ] "."
+                run (Npm Version) [] "."
+                run (Npm Install) [] "."
             )
 
             Target.create "Bundle" (fun _ ->
                 [
-                    "server", dotnet [ "publish"; "-c"; "Release"; "-o"; safe.DeployPath ] safe.ServerPath
-                    "client", dotnet [ "fable"; "-o"; "output"; "-s"; "--run"; "npx"; "vite"; "build" ] safe.ClientPath
+                    "server", toProcess (Dotnet Publish) [ "-c"; "Release"; "-o"; safe.DeployPath ] safe.ServerPath
+                    "client", toProcess (Dotnet Fable) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite"; "build" ] safe.ClientPath
                 ]
                 |> runParallel
             )
 
             Target.create "Run" (fun _ ->
-                run dotnet [ "build" ] safe.SharedPath
+                run (Dotnet Build) [] safe.SharedPath
                 [
-                    "server", dotnet [ "watch"; "run" ] safe.ServerPath
-                    "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientPath
+                    "server", toProcess (Dotnet WatchRun) [] safe.ServerPath
+                    "client", toProcess (Dotnet FableWatch) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientPath
                 ]
                 |> runParallel
             )
 
             Target.create "RunMirrord" (fun _ ->
-                run dotnet [ "build" ] safe.SharedPath
+                run (Dotnet Build) [] safe.SharedPath
                 Environment.setEnvironVar "RUN_IN" "mirrord"
                 [
-                    "server", createProcess "mirrord" [ "exec"; "--config-file"; "../../.mirrord/mirrord.json"; "--"; "dotnet"; "watch"; "run" ] safe.ServerPath
-                    "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientPath
+                    "server", toProcess Mirrord [ "exec"; "--config-file"; "../../.mirrord/mirrord.json"; "--"; "dotnet"; "watch"; "run" ] safe.ServerPath
+                    "client", toProcess (Dotnet FableWatch) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientPath
                 ]
                 |> runParallel
             )
 
             Target.create "WatchTests" (fun _ ->
-                run dotnet [ "build" ] safe.SharedTestsPath
+                run (Dotnet Build) [] safe.SharedTestsPath
 
                 [
-                    "server", dotnet [ "watch"; "run" ] safe.ServerTestsPath
-                    "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientTestsPath
+                    "server", toProcess (Dotnet WatchRun) [] safe.ServerTestsPath
+                    "client", toProcess (Dotnet FableWatch) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientTestsPath
                 ]
                 |> runParallel
             )
 
             Target.create "Tests" (fun _ ->
-                run dotnet [ "build" ] safe.SharedTestsPath
+                run (Dotnet Build) [] safe.SharedTestsPath
 
                 [
-                    "server", dotnet [ "run" ] safe.ServerTestsPath
-                    //"client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientTestsPath
+                    "server", toProcess (Dotnet Tests) [] safe.ServerTestsPath
+                    //"client", toProcess (Dotnet FableWatch) [ "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientTestsPath
                 ]
                 |> runParallel
             )
@@ -207,16 +209,15 @@ module internal Targets =
 
         Target.create "Build" (fun _ ->
             definition.Sources.All
-            |> Seq.iter (Path.getDirectory >> Dotnet.runOrFail "build")
+            |> Seq.iter (Path.getDirectory >> run (Dotnet Build) [])
         )
 
         Target.create "Lint" <| skipOn "no-lint" (fun _ ->
             definition.Sources.All
             ++ "build/build.fsproj"
             |> Seq.iter (fun fsproj ->
-                match Dotnet.runInRoot (sprintf "fsharplint lint %s" fsproj) with
-                | Ok () -> Trace.tracefn "Lint %s is Ok" fsproj
-                | Error e -> raise e
+                run (Dotnet Lint) [ fsproj ] "."
+                Trace.tracefn "Lint %s is Ok" fsproj
             )
         )
 
@@ -224,17 +225,14 @@ module internal Targets =
             Target.create "Tests" (fun _ ->
                 if definition.Sources.Tests |> Seq.isEmpty
                 then Trace.tracefn "There are no tests yet."
-                else Dotnet.runOrFail "run" "tests"
+                else run (Dotnet Tests) [] "tests"
             )
 
             let zipRelease releaseDir runtimeIds =
                 if releaseDir </> "zipCompiled" |> File.exists
                 then
-                    let zipReleaseProcess = createProcess (releaseDir </> "zipCompiled")
-
                     Trace.tracefn "\nZipping released files in %s ..." releaseDir
-                    run zipReleaseProcess "" "."
-                    |> Trace.tracefn "Zip result:\n%A\n"
+                    run (Raw (releaseDir </> "zipCompiled")) [] "."
 
                 Trace.tracefn "\nZip compiled files"
                 runtimeIds
@@ -250,9 +248,9 @@ module internal Targets =
                 | { Specs = Library { ReleaseDir = releaseDir; NugetApi = nugetApi } } ->
                     match "src" </> definition.Project.Name with
                     | releaseSource when releaseSource |> Directory.Exists ->
-                        Dotnet.runOrFail "pack" releaseSource
+                        run (Dotnet Pack) [] releaseSource
                     | _ ->
-                        Dotnet.runInRootOrFail "pack"
+                        runInRoot (Dotnet Pack) []
 
                     Directory.ensure releaseDir
 
@@ -283,16 +281,20 @@ module internal Targets =
                         yield! runtimeIds |> List.collect (RuntimeId.value >> fun runtimeId -> [project, runtimeId])
                     }
                     |> Seq.iter (fun (project, runtimeId) ->
-                        sprintf "publish -c Release /p:PublishSingleFile=true -o %s/%s --self-contained -r %s %s" releaseDir runtimeId runtimeId project
-                        |> Dotnet.runInRootOrFail
+                        runInRoot (Dotnet Publish) [
+                            "-c"; "Release"
+                            "/p:PublishSingleFile=true"
+                            "-o"; sprintf "%s/%s" releaseDir runtimeId
+                            "--self-contained"
+                            "-r"; runtimeId
+                            project
+                        ]
                     )
 
                     runtimeIds |> zipRelease releaseDir
 
                 | { Specs = Executable { ReleaseDir = releaseDir } } ->
-                    releaseDir
-                    |> sprintf "publish -c Release -o %s"
-                    |> Dotnet.runInRootOrFail
+                    runInRoot (Dotnet Publish) [ "-c"; "Release"; "-o"; releaseDir ]
 
                 | { Specs = SAFEStackApplication _ } -> failwithf "For releasing SAFE-Stack Application, use \"bundle\" target instead."
             )
@@ -350,21 +352,21 @@ module internal Targets =
             )
 
             Target.create "Watch" (fun _ ->
-                Dotnet.runInRootOrFail "watch run"
+                runInRoot (Dotnet WatchRun) []
             )
 
             Target.create "WatchMirrord" (fun _ ->
                 Environment.setEnvironVar "RUN_IN" "mirrord"
-                run (createProcess "mirrord") "exec --config-file .mirrord/mirrord.json -- dotnet watch run" "."
+                runInRoot Mirrord [ "exec"; "--config-file"; ".mirrord/mirrord.json"; "--"; "dotnet"; "watch"; "run" ]
             )
 
             Target.create "Run" (fun _ ->
-                Dotnet.runInRootOrFail "run"
+                runInRoot (Dotnet Run) []
             )
 
             Target.create "RunMirrord" (fun _ ->
                 Environment.setEnvironVar "RUN_IN" "mirrord"
-                run (createProcess "mirrord") "exec --config-file .mirrord/mirrord.json -- dotnet run" "."
+                runInRoot Mirrord [ "exec"; "--config-file"; ".mirrord/mirrord.json"; "--"; "dotnet"; "run" ]
             )
 
         // --------------------------------------------------------------------------------------------------------

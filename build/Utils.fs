@@ -12,6 +12,8 @@ module internal Utils =
     open Fake.Core.TargetOperators
     open Fake.Tools.Git
 
+    open Commands
+
     [<RequireQualifiedAccess>]
     module Args =
         let init args =
@@ -21,13 +23,22 @@ module internal Utils =
             |> Context.RuntimeContext.Fake
             |> Context.setExecutionContext
 
-        let run args =
-            match args with
-            | [| "-t"; target |] -> Target.runOrDefault target
-            | [| target |] -> Target.runOrDefaultWithArguments target
-            | _ -> Target.runOrDefaultWithArguments "Build"
+            CompactTrace.install ()
 
-            0 // return an integer exit code
+        let run args =
+            let runTarget () =
+                match args with
+                | [| "-t"; target |] -> Target.runOrDefault target
+                | [| target |] -> Target.runOrDefaultWithArguments target
+                | _ -> Target.runOrDefaultWithArguments "Build"
+
+            try
+                runTarget ()
+                0
+            // CompactTrace mutes the Build Time Report and its failure status; keep the failure visible
+            with :? BuildFailedException as ex when isRtkActive ->
+                eprintfn "%s" ex.Message
+                1
 
     let tee f a =
         f a
@@ -37,20 +48,6 @@ module internal Utils =
         if p.Context.Arguments |> Seq.contains option
         then Trace.tracefn "Skipped ..."
         else action p
-
-    let createProcess exe arg dir =
-        CreateProcess.fromRawCommandLine exe arg
-        |> CreateProcess.withWorkingDirectory dir
-        |> CreateProcess.ensureExitCode
-
-    let run proc arg dir =
-        proc arg dir
-        |> Proc.run
-        |> ignore
-
-    let orFail = function
-        | Error e -> raise e
-        | Ok ok -> ok
 
     let stringToOption = function
         | null | "" -> None
@@ -76,15 +73,6 @@ module internal Utils =
             | None -> failwith error
 
     [<RequireQualifiedAccess>]
-    module Dotnet =
-        let dotnet = createProcess "dotnet"
-
-        let run command dir = try run dotnet command dir |> Ok with e -> Error e
-        let runInRoot command = run command "."
-        let runOrFail command dir = run command dir |> orFail
-        let runInRootOrFail command = run command "." |> orFail
-
-    [<RequireQualifiedAccess>]
     module Nuget =
         let push releaseDir organization token =
             let sourceName =
@@ -93,19 +81,26 @@ module internal Utils =
                     let sourceName = "github"
 
                     Trace.tracefn "[Nuget] Add organization %A as a source" organization
-                    sprintf "nuget add source --username %s --password %s --store-password-in-clear-text --name %s \"https://nuget.pkg.github.com/%s/index.json\""
-                        organization token sourceName organization
-                    |> Dotnet.runInRootOrFail
+
+                    runInRoot (Nuget AddSource) [
+                        "--username"; organization
+                        "--password"; token
+                        "--store-password-in-clear-text"
+                        "--name"; sourceName
+                        sprintf "https://nuget.pkg.github.com/%s/index.json" organization
+                    ]
 
                     sourceName
                 )
 
             Trace.tracefn "[Nuget] Push packages"
-            sprintf "nuget push %s --source=%s --api-key=%s --skip-duplicate"
-                (releaseDir </> "*.nupkg")
-                (sourceName |> Option.defaultValue "https://api.nuget.org/v3/index.json")
-                token
-            |> Dotnet.runInRootOrFail
+
+            runInRoot (Nuget Push) [
+                releaseDir </> "*.nupkg"
+                sprintf "--source=%s" (sourceName |> Option.defaultValue "https://api.nuget.org/v3/index.json")
+                sprintf "--api-key=%s" token
+                "--skip-duplicate"
+            ]
 
     [<AutoOpen>]
     module ProjectDefinition =

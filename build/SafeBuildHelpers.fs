@@ -4,10 +4,6 @@ namespace ProjectBuild
 module internal SafeBuildHelpers =
     open Fake.Core
 
-    let initializeContext () =
-        let execContext = Context.FakeExecutionContext.Create false "build.fsx" [ ]
-        Context.setExecutionContext (Context.RuntimeContext.Fake execContext)
-
     module Proc =
         module Parallel =
             open System
@@ -71,39 +67,5 @@ module internal SafeBuildHelpers =
                 |> Array.map redirect
                 |> Array.Parallel.map Proc.run
 
-    let createProcess exe args dir =
-        // Use `fromRawCommand` rather than `fromRawCommandLine`, as its behaviour is less likely to be misunderstood.
-        // See https://github.com/SAFE-Stack/SAFE-template/issues/551.
-        CreateProcess.fromRawCommand exe args
-        |> CreateProcess.withWorkingDirectory dir
-        |> CreateProcess.ensureExitCode
-
-    let dotnet args dir = createProcess "dotnet" args dir
-
-    let npm args dir =
-        let npmPath =
-            match ProcessUtils.tryFindFileOnPath "npm" with
-            | Some path -> path
-            | None ->
-                "npm was not found in path. Please install it and make sure it's available from your path. "
-                + "See https://safe-stack.github.io/docs/quickstart/#install-pre-requisites for more info"
-                |> failwith
-
-        createProcess npmPath args dir
-
-    let run proc arg dir = proc arg dir |> Proc.run |> ignore
-
     let runParallel processes =
         processes |> Proc.Parallel.run |> ignore
-
-    let runOrDefault args =
-        try
-            match args with
-            | [| "-t"; target |]
-            | [| target |]
-                -> Target.runOrDefaultWithArguments target
-            | _ -> Target.runOrDefaultWithArguments "Run"
-            0
-        with e ->
-            printfn "%A" e
-            1
