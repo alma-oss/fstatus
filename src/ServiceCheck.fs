@@ -56,3 +56,10 @@ module internal ServiceCheck =
 
         return dataObjectStatuses
     }
+
+    let checkDomain (logger: ILogger) (domain: DomainToCheck): AsyncResult<Status, string> = asyncResult {
+        logger.LogDebug("Checking domain {domain}", domain.Name |> DomainName.value)
+
+        let! checkResult = domain.Check |> Check.execute |> AsyncResult.ofAsyncCatch (sprintf "%A")
+        return checkResult |> CheckResult.toStatus
+    }
