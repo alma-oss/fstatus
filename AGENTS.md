@@ -12,7 +12,7 @@ Add to `paket.references`:
 Alma.Status
 ```
 
-Current published version: **2.3.0** (`Status.fsproj` `<Version>`).
+Current published version: **2.0.0** (`Status.fsproj` `<Version>`).
 
 ## Tech Stack
 
