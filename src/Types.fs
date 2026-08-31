@@ -118,6 +118,19 @@ type SoftwareSystem = {
     DataObjects: DataObjectToCheck list
 }
 
+type DomainName = DomainName of string
+
+type DomainToCheck = {
+    Name: DomainName
+    Tags: Tag list
+    Check: Check
+}
+
+[<RequireQualifiedAccess>]
+type StatusOf =
+    | Domain of DomainToCheck
+    | System of SoftwareSystem
+
 [<RequireQualifiedAccess>]
 module CheckName =
     let value (CheckName name) = name
@@ -168,6 +181,10 @@ module Check =
 [<RequireQualifiedAccess>]
 module SystemName =
     let value (SystemName name) = name
+
+[<RequireQualifiedAccess>]
+module DomainName =
+    let value (DomainName name) = name
 
 [<RequireQualifiedAccess>]
 module SoftwareSystem =
