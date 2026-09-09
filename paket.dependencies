@@ -27,11 +27,4 @@ group Tests
 group Build
     storage none
     source https://api.nuget.org/v3/index.json
-    nuget Fake.DotNet.Cli
-    nuget Fake.IO.FileSystem
-    nuget Fake.IO.Zip
-    nuget Fake.Core.Target
-    nuget Fake.Core.UserInput
-    nuget Fake.DotNet.AssemblyInfoFile
-    nuget Fake.Core.ReleaseNotes
-    nuget Fake.Tools.Git
+    nuget Alma.Build ~> 2.0
