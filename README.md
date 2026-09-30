@@ -251,6 +251,20 @@ open Alma.Status
 let incidents = History.incidents ()
 ```
 
+## Kafka Stream Existence Check
+
+`healthCheckForStream loggerFactory (BrokerList "kafka:9092") streamInstance` asks Kafka for
+its topic list and reports whether the stream exists:
+
+- `Critical "Stream does not exist"` — Kafka answered and the topic is not in the list.
+- `Critical "Streams unavailable: <reason>"` — Kafka could not be asked. `<reason>` is
+  `timeout after 5 s`, `no streams returned by <brokers>`, or the Kafka exception message.
+- `Success` otherwise.
+
+The topic list is cached per broker list for 1 minute. Only a successful list is cached; a
+timeout, an empty list, or a Kafka error is never cached, so a broker outage clears from the
+status page as soon as Kafka recovers.
+
 ## Stream Lag-Aware Severity
 
 Use `StreamLagSeverity.idleOnUnhealthyUpToLag` when a consumer can be considered idle if lag is below a threshold:

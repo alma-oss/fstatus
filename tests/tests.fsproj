@@ -9,6 +9,7 @@
     <ItemGroup>
         <Compile Include="AssemblyInfo.fs" />
         <Compile Include="HealthCheckUrl.fs" />
+        <Compile Include="HealthCheckStream.fs" />
         <Compile Include="Tests.fs" />
     </ItemGroup>
 
