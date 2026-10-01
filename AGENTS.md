@@ -189,3 +189,8 @@ fstatus/
 - Service polling and data-object polling run forever once started. Consumers of `registerSystem` are responsible for scheduling and supervising those async loops.
 - The `build/` directory is shared FAKE boilerplate used across Alma repositories. Keep changes there narrow and deliberate.
 - Incident aggregation only records `Warning` and `Critical` results. `Success` and `Info` events do not become incident history entries.
+
+## Specs and plans
+
+SDD artifacts live under `docs/`: durable specs in `docs/specs/<capability>/spec.md`,
+transient plans in `docs/tasks/<work-slug>/plan.md` + `todo.md` (deleted once the work ships).

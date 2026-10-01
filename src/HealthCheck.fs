@@ -132,28 +132,44 @@ module HealthCheck =
     let healthCheckWithOAuth (createPublicUrlWithPath: CreatePublicUrlWithPath) (loggerFactory: ILoggerFactory) currentTier region credentials (method: string) instance =
         healthCheckWithOAuthPath createPublicUrlWithPath loggerFactory "/health-check" currentTier region credentials method instance
 
-    let private getAllStreams (loggerFactory: ILoggerFactory) kafkaBrokerList =
+    [<RequireQualifiedAccess>]
+    type StreamsError =
+        | Timeout of TimeSpan
+        | NoStreams of BrokerList
+        | Kafka of exn
+
+    [<RequireQualifiedAccess>]
+    module StreamsError =
+        let format = function
+            | StreamsError.Timeout t -> sprintf "timeout after %.0f s" t.TotalSeconds
+            | StreamsError.NoStreams (BrokerList brokers) -> sprintf "no streams returned by %s" brokers
+            | StreamsError.Kafka e -> e.Message
+
+    let private getAllStreams (loggerFactory: ILoggerFactory) (kafkaBrokerList: BrokerList) =
         let fetchTopics () = asyncResult {
             let logger = loggerFactory.CreateLogger("Kafka.Admin")
-            logger.LogInformation("Fetching streams")
+            logger.LogDebug("Fetching streams")
 
-            try
-                use admin = Admin.createAdmin kafkaBrokerList
-
+            let streamsResult =
                 try
-                    return admin |> Admin.getAllTopics
+                    use admin = Admin.createAdmin kafkaBrokerList
+                    admin |> Admin.getAllTopics |> Ok
                 with e ->
-                    logger.LogError("Streams error: {error}", e)
-                    return! AsyncResult.ofError e
+                    logger.LogError("Kafka error: {error}", e)
+                    Error (StreamsError.Kafka e)
 
-            with e ->
-                logger.LogError("Kafka error: {error}", e)
-                return! AsyncResult.ofError e
+            match streamsResult with
+            | Ok [] -> return! AsyncResult.ofError (StreamsError.NoStreams kafkaBrokerList)
+            | Ok streams -> return streams
+            | Error e -> return! AsyncResult.ofError e
         }
 
-        let key = "kafka.streams"
-        let ttl = (TimeSpan.FromMinutes(30.).TotalMilliseconds |> int) * 1<TemporaryCache.Millisecond>
-        let fetchWithTimeout () = fetchTopics () |> Async.withTimeout 5000 (Ok [])
+        let (BrokerList brokers) = kafkaBrokerList
+        let key = sprintf "kafka.streams:%s" brokers
+        let ttl = (TimeSpan.FromMinutes(1.).TotalMilliseconds |> int) * 1<TemporaryCache.Millisecond>
+        let fetchWithTimeout () =
+            fetchTopics ()
+            |> Async.withTimeout 5000 (Error (StreamsError.Timeout (TimeSpan.FromSeconds 5.)))
 
         TemporaryCache.load key fetchWithTimeout ttl
 
@@ -165,7 +181,10 @@ module HealthCheck =
 
             match! getAllStreams loggerFactory kafkaBrokerList with
             | Ok streams when streams |> List.contains (Instance stream) -> return CheckResult.success
-            | _ -> return CheckResult.critical "Stream does not exist"
+            | Ok _ -> return CheckResult.critical "Stream does not exist"
+            | Error error ->
+                let reason = error |> LoadError.format StreamsError.format
+                return CheckResult.critical (sprintf "Streams unavailable: %s" reason)
         }
     }
 
