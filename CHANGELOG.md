@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 2.0.1 - 2026-10-01
 - Fix: `healthCheckForStream` no longer caches a timed-out or empty topic list; failures read `Streams unavailable: <reason>` instead of `Stream does not exist`, and the topic list is cached for 1 min (was 30).
 
 ## 2.0.0 - 2026-08-19
