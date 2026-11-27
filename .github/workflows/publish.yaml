@@ -23,5 +23,4 @@ jobs:
       - name: Publish to NuGet.org
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-          DOTNET_ROLL_FORWARD: latestMajor
         run: ./build.sh -t publish
